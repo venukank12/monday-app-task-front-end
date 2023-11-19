@@ -10,6 +10,7 @@ const ConfigForm = ({ userId, boardId }) => {
   const actionFieldRef = useRef();
   const columnFieldRef = useRef();
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,12 +43,14 @@ const ConfigForm = ({ userId, boardId }) => {
   }, [userId, boardId]);
 
   const handleSaveConfig = useCallback(() => {
+    setLoading(true);
     setError(null);
     if (
       !actionFieldRef.current.state.value ||
       !columnFieldRef.current.state.value
     ) {
       setError("Please select both fields!");
+      setLoading(false);
       return;
     }
 
@@ -59,32 +62,35 @@ const ConfigForm = ({ userId, boardId }) => {
         cancelButton: "No, Skip",
         excludeCancelButton: false,
       })
-      .then(
-        async (res) =>
-          res.data.confirm &&
-          API.post("/config/add-or-update", {
-            userId,
-            boardId,
-            configType: "COLUMN_TO_WATCH_DUPLICATE",
-            configField: columnFieldRef.current.state.value.value,
-            configActionType: actionFieldRef.current.state.value.value,
-          })
-            .then((res) =>
-              mondayClient.execute("notice", {
-                message: "Your configurations has been updated successfully!",
-                type: "success", // or "error" (red), or "info" (blue)
-                timeout: 10000,
+      .then(async (res) =>
+        res.data.confirm
+          ? API.post("/config/add-or-update", {
+              userId,
+              boardId,
+              configType: "COLUMN_TO_WATCH_DUPLICATE",
+              configField: columnFieldRef.current.state.value.value,
+              configActionType: actionFieldRef.current.state.value.value,
+            })
+              .then((res) => {
+                mondayClient.execute("notice", {
+                  message: "Your configurations has been updated successfully!",
+                  type: "success", // or "error" (red), or "info" (blue)
+                  timeout: 10000,
+                });
+                setLoading(false);
               })
-            )
-            .catch((err) =>
-              mondayClient.execute("notice", {
-                message:
-                  "Could not save your configurations, please try again!",
-                type: "error", // or "error" (red), or "info" (blue)
-                timeout: 10000,
+              .catch((err) => {
+                mondayClient.execute("notice", {
+                  message:
+                    "Could not save your configurations, please try again!",
+                  type: "error", // or "error" (red), or "info" (blue)
+                  timeout: 10000,
+                });
+                setLoading(false);
               })
-            )
-      );
+          : setLoading(false)
+      )
+      .catch((err) => setLoading(false));
   }, [userId, boardId]);
 
   return (
@@ -150,7 +156,7 @@ const ConfigForm = ({ userId, boardId }) => {
       >
         <Button
           disabled={Boolean(
-            duplicateActionType.length === 0 || availableColumns.length === 0
+            loading || duplicateActionType.length === 0 || availableColumns.length === 0
           )}
           onClick={handleSaveConfig}
         >
